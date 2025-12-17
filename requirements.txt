@@ -1,0 +1,6 @@
+streamlit
+groq
+google-generativeai
+llama-index
+llama-index-llms-groq
+llama-index-embeddings-huggingface
