@@ -7,7 +7,6 @@ from llama_index.llms.groq import Groq as LlamaGroq
 from llama_index.core import Settings
 
 # 1. THE SETUP
-# 🛡️ SECURITY: I've removed your key. Paste your NEW key here!
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"] # For the Camera
 client = Groq(api_key=GROQ_API_KEY)
@@ -17,10 +16,9 @@ Settings.llm = LlamaGroq(model=MODEL_NAME, api_key=GROQ_API_KEY)
 # 2. CONFIGURE FREE MODELS
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# 3. THE LIBRARIAN (LlamaIndex)
-# This part reads your "data" folder so the AI knows real SAT questions
+# 3. THE LIBRARIAN 
+# This part reads "data" folder so the AI knows real SAT questions
 def get_sat_context(user_query):
-    """Simple function to read your /data folder and find helpful text"""
     context = ""
     data_dir = "./data"
     
@@ -50,7 +48,7 @@ with st.expander("📸 Scan a Problem with Camera"):
         st.image(img_file)
         if st.button("Analyze Photo"):
             # Use Gemini to "Read" the image
-            vision_model = genai.GenerativeModel('gemini-2.0-flash')
+            vision_model = genai.GenerativeModel('gemini-2.5-flash')
             img_data = img_file.getvalue()
             response = vision_model.generate_content(["Describe this SAT math/english problem and explain the first step to solve it Socratically.", {"mime_type": "image/jpeg", "data": img_data}])
             st.write(response.text)
@@ -186,4 +184,5 @@ if user_input := st.chat_input("Paste a math problem or an English passage here.
         st.write(response)
     
     # Save tutor message
+
     st.session_state["messages"].append({"role": "assistant", "content": response})
