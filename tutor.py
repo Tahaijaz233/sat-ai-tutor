@@ -4,7 +4,7 @@ import os
 import google.generativeai as genai
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.llms.groq import Groq as LlamaGroq
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from supabase import create_client, Client
 import hashlib
 
@@ -28,7 +28,7 @@ client = Groq(api_key=GROQ_API_KEY)
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # AI Engine
-Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+Settings.embed_model = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
 Settings.llm = LlamaGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY)
 
 # --- 2. AUTHENTICATION HELPERS ---
@@ -184,3 +184,4 @@ if prompt := st.chat_input("Ask your SAT question..."):
         
     save_user_progress()
     st.rerun()
+
