@@ -134,7 +134,7 @@ with c1:
 with c2:
     if st.button("🃏 + Flashcard"): st.session_state.show_flash_ui = True
 with c3:
-    if st.button("👶 ELI5 Mode"): st.session_state.last_request = "ELI5"
+    if st.button("👶 Explain Like I am 5"): st.session_state.last_request = "Explain Like I am 5"
 with c4:
     if st.button("💡 Mnemonic"): st.session_state.last_request = "MNEMONIC"
 
@@ -184,4 +184,5 @@ if prompt := st.chat_input("Ask your SAT question..."):
         
     save_user_progress()
     st.rerun()
+
 
