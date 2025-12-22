@@ -6,3 +6,4 @@ llama-index-llms-groq
 llama-index-embeddings-google
 llama-index-readers-file
 pypdf
+supabase
