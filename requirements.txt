@@ -3,7 +3,8 @@ groq
 google-generativeai
 llama-index-core
 llama-index-llms-groq
-llama-index-embeddings-google
+llama-index-embeddings-fastembed
 llama-index-readers-file
 pypdf
 supabase
+
