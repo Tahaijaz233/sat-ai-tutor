@@ -1,0 +1,20 @@
+{
+  "name": "SAT Super Tutor",
+  "short_name": "SATTutor",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4A90E2",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/owl_icon_192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/owl_icon_512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
