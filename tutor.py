@@ -2,190 +2,185 @@ import streamlit as st
 from groq import Groq
 import os
 import google.generativeai as genai
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext, load_index_from_storage
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
 from llama_index.llms.groq import Groq as LlamaGroq
-from llama_index.core import Settings
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from supabase import create_client, Client
+import hashlib
 
-# 1. THE SETUP
-GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"] # For the Camera
+# --- 1. CORE SETUP & SUPABASE ---
+st.set_page_config(page_title="SAT AI Super Tutor", page_icon="🦉", layout="wide")
+
+try:
+    # API Keys
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+    # Supabase Credentials
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except:
+    st.error("Missing Secrets in Streamlit!")
+    st.stop()
+
+# Initialize Clients
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 client = Groq(api_key=GROQ_API_KEY)
-MODEL_NAME = "llama-3.3-70b-versatile"
-Settings.llm = LlamaGroq(model=MODEL_NAME, api_key=GROQ_API_KEY)
-
-# 2. CONFIGURE FREE MODELS
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# 3. THE LIBRARIAN 
-# This part reads "data" folder so the AI knows real SAT questions
-def get_sat_context(user_query):
-    context = ""
-    data_dir = "./data"
-    
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-        return "No SAT Bank files found yet."
+# AI Engine
+Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+Settings.llm = LlamaGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY)
 
-    # This looks at every .txt file in your /data folder
-    for filename in os.listdir(data_dir):
-        if filename.endswith(".txt"):
-            with open(os.path.join(data_dir, filename), "r", encoding="utf-8") as f:
-                content = f.read()
-                # If the student's question is in this file, we use it!
-                if any(word.lower() in content.lower() for word in user_query.split()):
-                    context += f"\n--- From {filename} ---\n{content[:1000]}\n"
-    
-    return context if context else "Use your general SAT knowledge to help."
+# --- 2. AUTHENTICATION HELPERS ---
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
-# 4. UI & CAMERA
-st.set_page_config(page_title="SAT AI Tutor", page_icon="🦉")
-st.title("🦉 SAT Super Tutor")
+def save_user_progress():
+    if st.session_state.logged_in:
+        supabase.table("profiles").update({
+            "score": st.session_state.score,
+            "flashcards": st.session_state.flashcards,
+            "quests": st.session_state.quests,
+            "messages": st.session_state.messages[-15:] # Save last 15 messages
+        }).eq("username", st.session_state.username).execute()
 
-# Camera Input
-with st.expander("📸 Scan a Problem with Camera"):
-    img_file = st.camera_input("Take a photo of your SAT question")
-    if img_file:
-        st.image(img_file)
-        if st.button("Analyze Photo"):
-            # Use Gemini to "Read" the image
-            vision_model = genai.GenerativeModel('gemini-2.5-flash')
-            img_data = img_file.getvalue()
-            response = vision_model.generate_content(["Describe this SAT math/english problem and explain the first step to solve it Socratically.", {"mime_type": "image/jpeg", "data": img_data}])
-            st.write(response.text)
+# --- 3. LOGIN / SIGNUP SCREEN ---
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
 
-# 5. THE RULE BOOK (We move this to the top so the AI knows its job immediately)
-# I have added "English Tutoring" instructions here for you!
-system_prompt = """
-ROLE:
-You are an expert SAT Tutor for both Math and English. 
-
-THE GOLDEN RULE:
-Use the Socratic Method. Never give answers. Ask one small guiding question at a time.
-
-ENGLISH TUTORING RULES:
-1. If the student shares a reading passage, ask them: "What do you think the author's main point is?"
-2. FEEDBACK: If a student provides an answer or a step, GIVE YOUR OPINION. 
-   - If they are correct, say "Spot on!" and explain WHY they are right before asking a follow-up.
-   - If they are incorrect, say "I see your thinking, but let's look closer at..." and ask a question about their specific error.
-3. If they ask about grammar, ask: "Can you find the subject and the verb in this sentence?"
-4. Always ask the student to provide 'evidence' from the text for their choice.
-5. if they as an answer, give it and also give a thorough explanation.
-
-MATH TUTORING RULES:
-1. Ask the student for the first step to solve the problem.
-2. If they are stuck, give a hint about the math rule, not the number.
-3. FEEDBACK: If a student provides an answer or a step, GIVE YOUR OPINION. 
-   - If they are correct, say "Spot on!" and explain WHY they are right before asking a follow-up.
-   - If they are incorrect, say "I see your thinking, but let's look closer at..." and ask a question about their specific error.
-4. if they as an answer, give it and also give a thorough explanation.
-
-DISCLAIMER:
-You must occasionally remind the student that while you are an advanced AI, you can make mistakes and they should verify critical steps.
-
-TONE:
-Encouraging, patient, and professional. 🦉✨
-"""
-
-# 6. HELPER FUNCTION (For the download button)
-def convert_chat_to_text(messages):
-    chat_log = "SAT TUTOR STUDY SESSION\n" + "="*25 + "\n\n"
-    for msg in messages:
-        if msg["role"] != "system":
-            speaker = "Tutor" if msg["role"] == "assistant" else "Student"
-            chat_log += f"{speaker}: {msg['content']}\n\n"
-    return chat_log
-
-# 7. INITIALIZE MEMORY (This MUST happen before the sidebar uses it)
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "system", "content": system_prompt}]
-
-# 8. THE WEBSITE INTERFACE
-st.set_page_config(page_title="SAT AI Tutor", page_icon="🦉")
-st.title("🦉 Universal SAT Tutor")
-st.caption("I help with Math, Reading, and Writing. I guide, you learn.")
-
-# 9. SIDEBAR TOOLS
-with st.sidebar:
-    st.header("Study Tools")
-    full_chat_text = convert_chat_to_text(st.session_state["messages"])
-    st.download_button(
-        label="📥 Download Study Log",
-        data=full_chat_text,
-        file_name="sat_study_session.txt",
-        mime="text/plain"
-    )
-    if st.button("🗑️ Clear Chat"):
-        st.session_state["messages"] = [{"role": "system", "content": system_prompt}]
-        st.rerun()
-    with st.sidebar:
-        st.header("📸 Image Tutor")
-    uploaded_file = st.file_uploader("Upload or Paste an SAT question", type=["jpg", "jpeg", "png"])
-
-    if uploaded_file:
-        # Show a preview so the student knows it worked
-        st.image(uploaded_file, caption="Uploaded Problem", use_container_width=True)
+if not st.session_state.logged_in:
+    cols = st.columns([1, 2, 1])
+    with cols[1]:
+        st.title("🦉 SAT Super Tutor")
+        auth_mode = st.tabs(["Sign In", "Sign Up"])
         
-        if st.button("Analyze Photo"):
-            try:
-                # 1. Initialize the 'Eyes'
-                vision_model = genai.GenerativeModel('gemini-2.5-flash')
-                img_data = uploaded_file.getvalue()
-                
-                with st.spinner("The Owl is reading your photo..."):
-                    # 2. Get the transcript of the image
-                    response = vision_model.generate_content([
-                        "Extract all text, equations, and multiple-choice options from this SAT problem.",
-                        {"mime_type": "image/jpeg", "data": img_data}
-                    ])
-                    
-                    # 3. FEED THE BRAIN: Add the image text to the hidden chat history
-                    # This is how the AI knows what 'C' refers to later!
-                    image_text = response.text
-                    st.session_state.messages.append({
-                        "role": "user", 
-                        "content": f"[SYSTEM NOTE: Student uploaded a photo. Content: {image_text}]"
-                    })
-                    
-                    # 4. Post a friendly message to the UI
-                    st.session_state.messages.append({
-                        "role": "assistant", 
-                        "content": "📸 I've scanned your photo! Based on the problem I see, what's your initial thought on how to approach this?"
-                    })
-                    st.rerun()
+        with auth_mode[0]: # Login
+            with st.form("login"):
+                u = st.text_input("Username")
+                p = st.text_input("Password", type="password")
+                if st.form_submit_button("Login"):
+                    res = supabase.table("profiles").select("*").eq("username", u).execute()
+                    if res.data and res.data[0]["password_hash"] == hash_password(p):
+                        user_data = res.data[0]
+                        st.session_state.logged_in = True
+                        st.session_state.username = u
+                        st.session_state.score = user_data["score"]
+                        st.session_state.flashcards = user_data["flashcards"]
+                        st.session_state.quests = user_data["quests"]
+                        st.session_state.messages = user_data["messages"]
+                        st.rerun()
+                    else: st.error("Wrong username or password")
 
-            except Exception as e:
-                # This is the part your code was missing!
-                st.error(f"The Librarian hit a snag: {e}")
-                st.info("Try waiting 10 seconds or check if your Gemini API key is correct.")
-                
-                # Add Gemini's observation to the chat history
-            st.session_state.messages.append({"role": "assistant", "content": f"📸 I've looked at your image: {response.text}"})
-            st.rerun() # Refresh to show the message in the chat
+        with auth_mode[1]: # Sign Up
+            with st.form("signup"):
+                new_u = st.text_input("Create Username")
+                new_p = st.text_input("Create Password", type="password")
+                if st.form_submit_button("Join the Owl"):
+                    existing = supabase.table("profiles").select("username").eq("username", new_u).execute()
+                    if existing.data: st.error("Username already taken!")
+                    else:
+                        supabase.table("profiles").insert({
+                            "username": new_u, 
+                            "password_hash": hash_password(new_p),
+                            "quests": {"Ask a question": False, "Use the Camera": False, "Save a Flashcard": False}
+                        }).execute()
+                        st.success("Account created! Go to 'Sign In'")
+    st.stop()
 
-# 10. SHOW PREVIOUS CHAT
-for msg in st.session_state["messages"]:
-    if msg["role"] != "system":
+# --- 4. DATA LOADING (RAG) ---
+@st.cache_resource(show_spinner=False)
+def load_index():
+    if not os.path.exists("./data") or not os.listdir("./data"): return None
+    return VectorStoreIndex.from_documents(SimpleDirectoryReader("./data").load_data())
+
+sat_index = load_index()
+
+# --- 5. SIDEBAR (Analytics) ---
+with st.sidebar:
+    st.title(f"👤 {st.session_state.username}")
+    if st.button("Logout"):
+        save_user_progress()
+        st.session_state.logged_in = False
+        st.rerun()
+    
+    # SMART SCORE PREDICTOR
+    st.subheader("📈 SAT Analytics")
+    pts = st.session_state.score * 5
+    st.metric("XP Points", f"{st.session_state.score}", delta=f"+{pts} Est. Points")
+    
+    # DAILY QUESTS
+    st.subheader("🎯 Daily Quests")
+    for q, done in st.session_state.quests.items():
+        st.checkbox(q, value=done, disabled=True)
+
+    # FLASHCARDS
+    st.divider()
+    st.subheader("🗂️ My Flashcards")
+    for i, card in enumerate(st.session_state.flashcards):
+        with st.expander(f"📌 {card['term']}"):
+            st.write(card['def'])
+
+# --- 6. CHAT & ACTIONS ---
+chat_container = st.container()
+with chat_container:
+    for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
 
-# 11. THE CONVERSATION LOOP
-if user_input := st.chat_input("Paste a math problem or an English passage here..."):
-    # Save user message
-    st.session_state["messages"].append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.write(user_input)
+# FLOATING ACTION BAR
+st.write("---")
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    if st.button("📸 Scan Image"): st.session_state.show_camera = True
+with c2:
+    if st.button("🃏 + Flashcard"): st.session_state.show_flash_ui = True
+with c3:
+    if st.button("👶 ELI5 Mode"): st.session_state.last_request = "ELI5"
+with c4:
+    if st.button("💡 Mnemonic"): st.session_state.last_request = "MNEMONIC"
 
-    # Get answer from the brain
-    with st.chat_message("assistant"):
-        stream = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=st.session_state["messages"],
-            temperature=0.7,
-        )
-        response = stream.choices[0].message.content
-        st.write(response)
+# Feature Modals
+if st.session_state.get("show_camera"):
+    img = st.camera_input("Snap a problem")
+    if img:
+        st.session_state.quests["Use the Camera"] = True
+        res = genai.GenerativeModel('gemini-2.0-flash').generate_content(["Extract SAT text.", {"mime_type": "image/jpeg", "data": img.getvalue()}])
+        st.session_state.messages.append({"role": "user", "content": f"[Scanned Image]: {res.text}"})
+        st.session_state.show_camera = False
+        save_user_progress()
+        st.rerun()
+
+if st.session_state.get("show_flash_ui"):
+    with st.form("flash_form"):
+        t, d = st.text_input("Term"), st.text_area("Definition")
+        if st.form_submit_button("Save"):
+            st.session_state.flashcards.append({"term": t, "def": d})
+            st.session_state.quests["Save a Flashcard"] = True
+            st.session_state.show_flash_ui = False
+            save_user_progress()
+            st.rerun()
+
+# --- 7. PINNED INPUT ---
+if prompt := st.chat_input("Ask your SAT question..."):
+    st.session_state.quests["Ask a question"] = True
+    st.session_state.messages.append({"role": "user", "content": prompt})
     
-    # Save tutor message
+    # RAG
+    context = ""
+    if sat_index:
+        nodes = sat_index.as_retriever(similarity_top_k=2).retrieve(prompt)
+        context = "\n".join([n.get_text() for n in nodes])
 
-    st.session_state["messages"].append({"role": "assistant", "content": response})
-
+    with st.chat_message("assistant"):
+        instr = "Explain like a child." if st.session_state.get("last_request") == "ELI5" else ""
+        st.session_state.last_request = None
+        
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": f"Socratic SAT Tutor. Context: {context}. {instr}"}] + st.session_state.messages
+        ).choices[0].message.content
+        st.write(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        if "spot on" in response.lower(): st.session_state.score += 2
+        
+    save_user_progress()
+    st.rerun()
