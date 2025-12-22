@@ -108,6 +108,13 @@ with st.sidebar:
         save_user_progress()
         st.session_state.logged_in = False
         st.rerun()
+        
+with st.sidebar:
+    with st.expander("📲 Get the Mobile App"):
+        st.write("1. Open this site in **Chrome** on your phone.")
+        st.write("2. Tap the **3 dots** (top right).")
+        st.write("3. Tap **'Install App'** or **'Add to Home Screen'**.")
+        st.info("The Owl icon will appear on your home screen!")
     
     # SMART SCORE PREDICTOR
     st.subheader("📈 SAT Analytics")
@@ -191,6 +198,7 @@ if prompt := st.chat_input("Ask your SAT question..."):
         
     save_user_progress()
     st.rerun()
+
 
 
 
