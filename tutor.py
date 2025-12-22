@@ -69,6 +69,7 @@ ENGLISH TUTORING RULES:
    - If they are incorrect, say "I see your thinking, but let's look closer at..." and ask a question about their specific error.
 3. If they ask about grammar, ask: "Can you find the subject and the verb in this sentence?"
 4. Always ask the student to provide 'evidence' from the text for their choice.
+5. if they as an answer, give it and also give a thorough explanation.
 
 MATH TUTORING RULES:
 1. Ask the student for the first step to solve the problem.
@@ -76,6 +77,7 @@ MATH TUTORING RULES:
 3. FEEDBACK: If a student provides an answer or a step, GIVE YOUR OPINION. 
    - If they are correct, say "Spot on!" and explain WHY they are right before asking a follow-up.
    - If they are incorrect, say "I see your thinking, but let's look closer at..." and ask a question about their specific error.
+4. if they as an answer, give it and also give a thorough explanation.
 
 DISCLAIMER:
 You must occasionally remind the student that while you are an advanced AI, you can make mistakes and they should verify critical steps.
@@ -186,3 +188,4 @@ if user_input := st.chat_input("Paste a math problem or an English passage here.
     # Save tutor message
 
     st.session_state["messages"].append({"role": "assistant", "content": response})
+
