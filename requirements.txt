@@ -1,6 +1,8 @@
 streamlit
 groq
 google-generativeai
-llama-index
+llama-index-core
 llama-index-llms-groq
-llama-index-embeddings-huggingface
+llama-index-embeddings-google
+llama-index-readers-file
+pypdf
