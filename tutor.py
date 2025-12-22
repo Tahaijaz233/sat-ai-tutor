@@ -10,6 +10,13 @@ import hashlib
 
 # --- 1. CORE SETUP & SUPABASE ---
 st.set_page_config(page_title="SAT AI Super Tutor", page_icon="🦉", layout="wide")
+st.markdown(
+    f"""
+    <link rel="manifest" href="https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/manifest.json">
+    <meta name="theme-color" content="#4A90E2">
+    """,
+    unsafe_allow_html=True
+)
 
 try:
     # API Keys
@@ -184,6 +191,7 @@ if prompt := st.chat_input("Ask your SAT question..."):
         
     save_user_progress()
     st.rerun()
+
 
 
 
