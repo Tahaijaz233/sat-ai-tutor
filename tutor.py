@@ -143,7 +143,7 @@ if st.session_state.get("show_camera"):
     img = st.camera_input("Snap a problem")
     if img:
         st.session_state.quests["Use the Camera"] = True
-        res = genai.GenerativeModel('gemini-2.0-flash').generate_content(["Extract SAT text.", {"mime_type": "image/jpeg", "data": img.getvalue()}])
+        res = genai.GenerativeModel('gemini-2.5-flash').generate_content(["Extract SAT text.", {"mime_type": "image/jpeg", "data": img.getvalue()}])
         st.session_state.messages.append({"role": "user", "content": f"[Scanned Image]: {res.text}"})
         st.session_state.show_camera = False
         save_user_progress()
@@ -184,5 +184,6 @@ if prompt := st.chat_input("Ask your SAT question..."):
         
     save_user_progress()
     st.rerun()
+
 
 
